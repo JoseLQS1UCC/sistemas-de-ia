@@ -3,8 +3,10 @@ import random
 
 import math
 
-ROW_COUNT = 6
-COLUMN_COUNT = 7
+ROW_COUNT = 4
+COLUMN_COUNT = 5
+
+lista_mov = []
 
 PLAYER = 0
 AI = 1
@@ -58,6 +60,7 @@ def winning_move(board, piece):
 			if board[r][c] == piece and board[r-1][c+1] == piece and board[r-2][c+2] == piece and board[r-3][c+3] == piece:
 				return True
 
+# FUNCIÓN DE EVALUACIÓN POR HILERAS -> A MAYOR NUMERO DE PIEZAS, MAYOR SCORE
 def evaluate_window(window, piece):
 	score = 0
 	opp_piece = PLAYER_PIECE
@@ -84,79 +87,129 @@ def score_position(board, piece):
 	center_count = center_array.count(piece)
 	score += center_count * 3
 
-	## Score Horizontal
+	## Score Horizontal -> EVALUA CADA FILA
 	for r in range(ROW_COUNT):
 		row_array = [int(i) for i in list(board[r,:])]
 		for c in range(COLUMN_COUNT-3):
 			window = row_array[c:c+WINDOW_LENGTH]
 			score += evaluate_window(window, piece)
 
-	## Score Vertical
+	## Score Vertical -> EVALUA CADA COLUMNA
 	for c in range(COLUMN_COUNT):
 		col_array = [int(i) for i in list(board[:,c])]
 		for r in range(ROW_COUNT-3):
 			window = col_array[r:r+WINDOW_LENGTH]
 			score += evaluate_window(window, piece)
 
-	## Score posiive sloped diagonal
+	## Score posiive sloped diagonal -> EVALUA CADA DIAGONAL HACIA LA DERECHA
 	for r in range(ROW_COUNT-3):
 		for c in range(COLUMN_COUNT-3):
 			window = [board[r+i][c+i] for i in range(WINDOW_LENGTH)]
 			score += evaluate_window(window, piece)
 
+	## -> EVALUA CADA DIAGONAL HACIA LA IZQUIERDA
 	for r in range(ROW_COUNT-3):
 		for c in range(COLUMN_COUNT-3):
 			window = [board[r+3-i][c+i] for i in range(WINDOW_LENGTH)]
 			score += evaluate_window(window, piece)
 
+	# RETORNA LA SUMA DE TODAS LAS EVALUACIONES
 	return score
 
 def is_terminal_node(board):
 	return winning_move(board, PLAYER_PIECE) or winning_move(board, AI_PIECE) or len(get_valid_locations(board)) == 0
 
+# INICIALMENTE SE LANZA CON PROFUNDIDAD 5 Y DESDE UN NODO DE MAXIMIZACIÓN
+# @maximizingPlayer INDICA SI ES UN NODO MAX
 def minimax(board, depth, alpha, beta, maximizingPlayer):
+	# COLUMNAS NO LLENAS
 	valid_locations = get_valid_locations(board)
+
+	# VALIDA SI EL JUEGO TERMINA EN ESTE TABLERO: AI GANO/PLAYER GANO/EMPATE
 	is_terminal = is_terminal_node(board)
 	if depth == 0 or is_terminal:
 		if is_terminal:
+
+			# RETORNA BUENA VALORACIÓN PARA JUGADAS GANADORAS DE IA
 			if winning_move(board, AI_PIECE):
 				return (None, 100000000000000)
+
+			# RETORNA MALA VALORACIÓN PARA JUGADAS GANADORAS DE PLAYER
 			elif winning_move(board, PLAYER_PIECE):
 				return (None, -10000000000000)
+
+			# RETORNA 0 PARA JUGADAS DE EMPATE
 			else: # Game is over, no more valid moves
 				return (None, 0)
 		else: # Depth is zero
+
+			# RETORNA LA EVALUACIÓN DE LA POSICIÓN DEL TABLERO
 			return (None, score_position(board, AI_PIECE))
+		
+	# SI EL JUEGO NO TERMINO -> Y EL ALGORITMO TIENE UN NODO MAX
 	if maximizingPlayer:
 		value = -math.inf
+
+		# CÁLCULA MEJOR MOVIMIENTO INMEDIATO
 		column = pick_best_move(board, AI_PIECE)
+
+		# JUEGA EN TODAS LAS COLUMNAS VALIDAS
 		for col in valid_locations:
 			row = get_next_open_row(board, col)
 			b_copy = board.copy()
 			drop_piece(b_copy, row, col, AI_PIECE)
+
+			# ESTIMA LA EVALUACIÓN DE LAS JUGADAS SIGUIENTES...
 			new_score = minimax(b_copy, depth-1, alpha, beta, False)[1]
+
+			# SI, TRAS ESAS JUGADAS LA EVALUACIÓN ES MEJOR
+			# SE ELIGE COMO JUGADA SIGUIENTE
 			if new_score > value:
 				value = new_score
 				column = col
+
+			# PODA DEL ÁRBOL
 			alpha = max(alpha, value)
 			if alpha >= beta:
 				break
+
+		indt = "    " * (5-depth)
+		game_status = f"{indt}MAX [{column}]: {value}"
+
+		lista_mov.append( game_status )
 		return column, value
 
+	# SI EL JUEGO NO TERMINO -> Y EL ALGORITMO TIENE UN NODO MIN
 	else: # Minimizing player
 		value = math.inf
+
+		# CÁLCULA MEJOR MOVIMIENTO INMEDIATO
 		column = pick_best_move(board, AI_PIECE)
+
+		# JUEGA EN TODAS LAS COLUMNAS VALIDAS COMO JUGADOR
 		for col in valid_locations:
 			row = get_next_open_row(board, col)
 			b_copy = board.copy()
 			drop_piece(b_copy, row, col, PLAYER_PIECE)
+
+			# ESTIMA LA EVALUACIÓN DE LAS JUGADAS SIGUIENTES...
 			new_score = minimax(b_copy, depth-1, alpha, beta, True)[1]
+
+			# SI, TRAS ESAS JUGADAS LA EVALUACIÓN ES PEOR
+			# SE ELIGE COMO JUGADA SIGUIENTE DEL JUGADOR
 			if new_score < value:
 				value = new_score
 				column = col
 			beta = min(beta, value)
+
+			# PODA DEL ÁRBOL
 			if alpha >= beta:
 				break
+
+		indt = "    " * (5-depth)
+		game_status = f"{indt}MIN [{column}]: {value}"
+
+		lista_mov.append( game_status )
 		return column, value
 
 def get_valid_locations(board):
@@ -166,6 +219,7 @@ def get_valid_locations(board):
 			valid_locations.append(col)
 	return valid_locations
 
+# CALCULADORA DE LA MEJOR POSICIÓN A JUGAR
 def pick_best_move(board, piece):
 
 	valid_locations = get_valid_locations(board)
@@ -186,6 +240,7 @@ board = create_board()
 Human = input("Input your Name : ")
 print_board(board)
 game_over = False
+cont_turn = 0
 turn = random.randint(PLAYER, AI)
 
 while not game_over:
@@ -210,7 +265,7 @@ while not game_over:
 
 
 #AI INPUT
-    if turn == AI and not game_over:				
+    if turn == AI and not game_over:
         print("AI's Move :")
         col, minimax_score = minimax(board, 5, -math.inf, math.inf, True)
 
@@ -229,3 +284,9 @@ while not game_over:
 
         turn += 1
         turn = turn % 2
+		
+        lista_mov.reverse()
+        print( '\n'.join(lista_mov) )
+        lista_mov = []
+
+    cont_turn = cont_turn + 1
