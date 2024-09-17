@@ -1,1 +1,7 @@
 /metodos-busqueda-informacion/__pycache__
+
+# Entorno virtual
+.venv
+
+# Carpeta 
+análisis
