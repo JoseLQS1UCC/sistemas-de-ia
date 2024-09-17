@@ -1,25 +1,22 @@
 import numpy as np
 import random
-
 import math
+import os
 
 ROW_COUNT = 4
 COLUMN_COUNT = 5
-
-lista_mov = []
-
 PLAYER = 0
 AI = 1
-
 EMPTY = 0
 PLAYER_PIECE = 1
 AI_PIECE = 2
-
 WINDOW_LENGTH = 4
 
+if not os.path.exists('análisis'):
+    os.makedirs('análisis')
+
 def create_board():
-	board = np.zeros((ROW_COUNT,COLUMN_COUNT))
-	return board
+    return np.zeros((ROW_COUNT, COLUMN_COUNT))
 
 def drop_piece(board, row, col, piece): #piece can be from AI / Human
 	board[row][col] = piece
@@ -123,94 +120,71 @@ def is_terminal_node(board):
 # @maximizingPlayer INDICA SI ES UN NODO MAX
 def minimax(board, depth, alpha, beta, maximizingPlayer):
 	# COLUMNAS NO LLENAS
-	valid_locations = get_valid_locations(board)
+    valid_locations = get_valid_locations(board)
 
 	# VALIDA SI EL JUEGO TERMINA EN ESTE TABLERO: AI GANO/PLAYER GANO/EMPATE
-	is_terminal = is_terminal_node(board)
-	if depth == 0 or is_terminal:
-		if is_terminal:
+    is_terminal = is_terminal_node(board)
+    if depth == 0 or is_terminal:
+        if is_terminal:
 
 			# RETORNA BUENA VALORACIÓN PARA JUGADAS GANADORAS DE IA
-			if winning_move(board, AI_PIECE):
-				return (None, 100000000000000)
+            if winning_move(board, AI_PIECE):
+                return (None, 100000000000000)
 
 			# RETORNA MALA VALORACIÓN PARA JUGADAS GANADORAS DE PLAYER
-			elif winning_move(board, PLAYER_PIECE):
-				return (None, -10000000000000)
+            elif winning_move(board, PLAYER_PIECE):
+                return (None, -10000000000000)
 
 			# RETORNA 0 PARA JUGADAS DE EMPATE
-			else: # Game is over, no more valid moves
-				return (None, 0)
-		else: # Depth is zero
-
+            else: # Game is over, no more valid moves
+                return (None, 0)
+        else: # Depth is zero
 			# RETORNA LA EVALUACIÓN DE LA POSICIÓN DEL TABLERO
-			return (None, score_position(board, AI_PIECE))
-		
-	# SI EL JUEGO NO TERMINO -> Y EL ALGORITMO TIENE UN NODO MAX
-	if maximizingPlayer:
-		value = -math.inf
+            return (None, score_position(board, AI_PIECE))
+
+	# SI EL JUEGO NO TERMINÓ -> Y EL ALGORITMO TIENE UN NODO MAX
+    if maximizingPlayer:
+        value = -math.inf
 
 		# CÁLCULA MEJOR MOVIMIENTO INMEDIATO
-		column = pick_best_move(board, AI_PIECE)
-
-		# JUEGA EN TODAS LAS COLUMNAS VALIDAS
-		for col in valid_locations:
-			row = get_next_open_row(board, col)
-			b_copy = board.copy()
-			drop_piece(b_copy, row, col, AI_PIECE)
+        column = pick_best_move(board, AI_PIECE)
+        for col in valid_locations:
+            row = get_next_open_row(board, col)
+            b_copy = board.copy()
+            drop_piece(b_copy, row, col, AI_PIECE)
 
 			# ESTIMA LA EVALUACIÓN DE LAS JUGADAS SIGUIENTES...
-			new_score = minimax(b_copy, depth-1, alpha, beta, False)[1]
+            new_score = minimax(b_copy, depth-1, alpha, beta, False)[1]
 
 			# SI, TRAS ESAS JUGADAS LA EVALUACIÓN ES MEJOR
-			# SE ELIGE COMO JUGADA SIGUIENTE
-			if new_score > value:
-				value = new_score
-				column = col
+            # SE ELIGE COMO JUGADA SIGUIENTE
+            if new_score > value:
+                value = new_score
+                column = col
 
 			# PODA DEL ÁRBOL
-			alpha = max(alpha, value)
-			if alpha >= beta:
-				break
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                break
+        log_turn(depth, "MAX", column, value)
+        return column, value
 
-		indt = "    " * (5-depth)
-		game_status = f"{indt}MAX [{column}]: {value}"
-
-		lista_mov.append( game_status )
-		return column, value
-
-	# SI EL JUEGO NO TERMINO -> Y EL ALGORITMO TIENE UN NODO MIN
-	else: # Minimizing player
-		value = math.inf
-
-		# CÁLCULA MEJOR MOVIMIENTO INMEDIATO
-		column = pick_best_move(board, AI_PIECE)
-
-		# JUEGA EN TODAS LAS COLUMNAS VALIDAS COMO JUGADOR
-		for col in valid_locations:
-			row = get_next_open_row(board, col)
-			b_copy = board.copy()
-			drop_piece(b_copy, row, col, PLAYER_PIECE)
-
-			# ESTIMA LA EVALUACIÓN DE LAS JUGADAS SIGUIENTES...
-			new_score = minimax(b_copy, depth-1, alpha, beta, True)[1]
-
-			# SI, TRAS ESAS JUGADAS LA EVALUACIÓN ES PEOR
-			# SE ELIGE COMO JUGADA SIGUIENTE DEL JUGADOR
-			if new_score < value:
-				value = new_score
-				column = col
-			beta = min(beta, value)
-
-			# PODA DEL ÁRBOL
-			if alpha >= beta:
-				break
-
-		indt = "    " * (5-depth)
-		game_status = f"{indt}MIN [{column}]: {value}"
-
-		lista_mov.append( game_status )
-		return column, value
+    else:
+        value = math.inf
+        column = pick_best_move(board, AI_PIECE)
+        for col in valid_locations:
+            row = get_next_open_row(board, col)
+            b_copy = board.copy()
+            drop_piece(b_copy, row, col, PLAYER_PIECE)
+            new_score = minimax(b_copy, depth-1, alpha, beta, True)[1]
+            if new_score < value:
+                value = new_score
+                column = col
+            beta = min(beta, value)
+            if alpha >= beta:
+                break
+        log_turn(depth, "MIN", column, value)
+        return column, value
 
 def get_valid_locations(board):
 	valid_locations = []
@@ -235,6 +209,12 @@ def pick_best_move(board, piece):
 			best_col = col
 
 	return best_col
+
+def log_turn(depth, player_type, column, value):
+    indent = "    " * (5-depth)
+    game_status = f"{indent}{player_type} [{column}]: {value}"
+    with open(f'análisis/turn_{cont_turn}.txt', 'w') as f:
+        f.write(game_status + '\n')
 
 board = create_board()
 Human = input("Input your Name : ")
@@ -270,7 +250,6 @@ while not game_over:
         col, minimax_score = minimax(board, 5, -math.inf, math.inf, True)
 
         if is_valid_location(board, col):
-
             row = get_next_open_row(board, col)
             drop_piece(board, row, col, AI_PIECE)
             print_board(board)            
@@ -281,12 +260,7 @@ while not game_over:
 
             print_board(board)
 
-
         turn += 1
         turn = turn % 2
-		
-        lista_mov.reverse()
-        print( '\n'.join(lista_mov) )
-        lista_mov = []
 
-    cont_turn = cont_turn + 1
+        cont_turn += 1
